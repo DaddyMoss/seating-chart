@@ -23,7 +23,7 @@
         input, textarea { width: 100%; margin-bottom: 15px; padding: 10px; box-sizing: border-box; background: #000; color: white; border: 1px solid #444; }
     </style>
 </head>
-<body onload="init()" onclick="runVid()">
+<body onload="init()">
     <div id="vid-bg"></div>
     <header>
         <div id="label">CLASS NAME</div>
@@ -49,8 +49,15 @@
         let db = { label: "1A", names: [], yt: "", color: "#438a2e", map: {} };
         const corners =;
         function init() {
-            const data = localStorage.getItem('class_final');
-            if (data) db = JSON.parse(data);
+            const data = localStorage.getItem('class_v6');
+            if (data) {
+                db = JSON.parse(data);
+            } else {
+                openSet(); // AUTO-OPEN SETTINGS IF EMPTY
+            }
+            render();
+        }
+        function render() {
             const grid = document.getElementById('grid');
             grid.innerHTML = '';
             for (let i = 0; i < 36; i++) {
@@ -64,13 +71,16 @@
             document.documentElement.style.setProperty('--seat-color', db.color);
             const abs = document.getElementById('absent');
             const seated = Object.values(db.map);
+            abs.innerHTML = '';
             db.names.forEach(n => { if (!seated.includes(n)) abs.appendChild(createStu(n)); });
+            runVid();
         }
         function runVid() {
             const bg = document.getElementById('vid-bg');
             if (db.yt && bg.innerHTML === "") {
-                const id = db.yt.match(/(?:v=|\/be\/|embed\/|shorts\/)([^?&]+)/);
-                if (id) bg.innerHTML = `<iframe src="https://youtube.com{id[1]}?autoplay=1&mute=1&loop=1&playlist=${id[1]}&controls=0" allow="autoplay"></iframe>`;
+                const idMatch = db.yt.match(/(?:v=|\/be\/|embed\/|shorts\/)([^?&]+)/);
+                const id = idMatch ? idMatch : null;
+                if (id) bg.innerHTML = `<iframe src="https://youtube.com{id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0" allow="autoplay"></iframe>`;
             }
         }
         function createStu(n) {
@@ -87,7 +97,9 @@
             db.names = document.getElementById('in-names').value.split(',').map(n => n.trim()).filter(n => n);
             db.yt = document.getElementById('in-yt').value;
             db.color = document.getElementById('in-color').value;
-            db.map = {}; localStorage.setItem('class_final', JSON.stringify(db)); location.reload();
+            db.map = {}; 
+            localStorage.setItem('class_v6', JSON.stringify(db));
+            location.reload();
         }
         function allow(e) { e.preventDefault(); }
         function drag(e) { e.dataTransfer.setData("text", e.target.id); }
@@ -97,15 +109,22 @@
             if (!zone || zone.classList.contains('hide')) return;
             if (target.classList.contains('student')) { const p1 = el.parentNode; const p2 = target.parentNode; p2.appendChild(el); p1.appendChild(target); }
             else { zone.appendChild(el); }
-            db.map = {}; document.querySelectorAll('.seat').forEach(s => { const stu = s.querySelector('.student'); if (stu) db.map[s.id.replace('s', '')] = stu.innerText; });
-            localStorage.setItem('class_final', JSON.stringify(db));
+            savePos();
+        }
+        function savePos() {
+            db.map = {}; 
+            document.querySelectorAll('.seat').forEach(s => {
+                const stu = s.querySelector('.student');
+                if (stu) db.map[s.id.replace('s', '')] = stu.innerText;
+            });
+            localStorage.setItem('class_v6', JSON.stringify(db));
         }
         function shuffle() {
             const seats = Array.from(document.querySelectorAll('.seat:not(.hide)'));
             const stus = Array.from(document.querySelectorAll('.student')).filter(s => s.closest('.seat'));
-            seats.forEach(s => s.innerHTML = ''); stus.sort(() => Math.random() - 0.5).forEach((s, i) => { if (seats[i]) seats[i].appendChild(s); });
-            db.map = {}; document.querySelectorAll('.seat').forEach(s => { const stu = s.querySelector('.student'); if (stu) db.map[s.id.replace('s', '')] = stu.innerText; });
-            localStorage.setItem('class_final', JSON.stringify(db));
+            seats.forEach(s => s.innerHTML = ''); 
+            stus.sort(() => Math.random() - 0.5).forEach((s, i) => { if (seats[i]) seats[i].appendChild(s); });
+            savePos();
         }
     </script>
 </body>
