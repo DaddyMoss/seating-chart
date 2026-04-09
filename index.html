@@ -23,7 +23,7 @@
         input, textarea { width: 100%; margin-bottom: 15px; padding: 10px; box-sizing: border-box; background: #000; color: white; border: 1px solid #444; }
     </style>
 </head>
-<body onload="init()">
+<body onload="init()" onclick="runVid()">
     <div id="vid-bg"></div>
     <header>
         <div id="label">CLASS NAME</div>
@@ -49,12 +49,8 @@
         let db = { label: "1A", names: [], yt: "", color: "#438a2e", map: {} };
         const corners =;
         function init() {
-            const data = localStorage.getItem('class_v6');
-            if (data) {
-                db = JSON.parse(data);
-            } else {
-                openSet(); // AUTO-OPEN SETTINGS IF EMPTY
-            }
+            const data = localStorage.getItem('class_v7');
+            if (data) { db = JSON.parse(data); } else { setTimeout(openSet, 500); }
             render();
         }
         function render() {
@@ -64,7 +60,7 @@
                 const s = document.createElement('div');
                 s.className = corners.includes(i) ? 'seat hide' : 'seat';
                 s.id = 's' + i; s.setAttribute('ondrop', 'drop(event)'); s.setAttribute('ondragover', 'allow(event)');
-                if (db.map[i] && !corners.includes(i)) s.appendChild(createStu(db.map[i]));
+                if (db.map[i]) s.appendChild(createStu(db.map[i]));
                 grid.appendChild(s);
             }
             document.getElementById('label').innerText = db.label;
@@ -79,8 +75,10 @@
             const bg = document.getElementById('vid-bg');
             if (db.yt && bg.innerHTML === "") {
                 const idMatch = db.yt.match(/(?:v=|\/be\/|embed\/|shorts\/)([^?&]+)/);
-                const id = idMatch ? idMatch : null;
-                if (id) bg.innerHTML = `<iframe src="https://youtube.com{id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0" allow="autoplay"></iframe>`;
+                if (idMatch) {
+                    const id = idMatch;
+                    bg.innerHTML = `<iframe src="https://youtube.com{id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0" allow="autoplay"></iframe>`;
+                }
             }
         }
         function createStu(n) {
@@ -90,7 +88,7 @@
             d.setAttribute('ondragstart', 'drag(event)');
             return d;
         }
-        function openSet() { document.getElementById('modal-box').style.display = 'block'; document.getElementById('in-label').value = db.label; document.getElementById('in-names').value = db.names.join(', '); document.getElementById('in-yt').value = db.yt; }
+        function openSet() { document.getElementById('modal-box').style.display = 'block'; }
         function closeSet() { document.getElementById('modal-box').style.display = 'none'; }
         function save() {
             db.label = document.getElementById('in-label').value;
@@ -98,7 +96,7 @@
             db.yt = document.getElementById('in-yt').value;
             db.color = document.getElementById('in-color').value;
             db.map = {}; 
-            localStorage.setItem('class_v6', JSON.stringify(db));
+            localStorage.setItem('class_v7', JSON.stringify(db));
             location.reload();
         }
         function allow(e) { e.preventDefault(); }
@@ -107,8 +105,9 @@
             e.preventDefault(); const id = e.dataTransfer.getData("text"); const el = document.getElementById(id);
             const target = e.target; const zone = target.closest('.seat') || target.closest('#absent');
             if (!zone || zone.classList.contains('hide')) return;
-            if (target.classList.contains('student')) { const p1 = el.parentNode; const p2 = target.parentNode; p2.appendChild(el); p1.appendChild(target); }
-            else { zone.appendChild(el); }
+            if (target.classList.contains('student')) {
+                const p1 = el.parentNode; const p2 = target.parentNode; p2.appendChild(el); p1.appendChild(target);
+            } else { zone.appendChild(el); }
             savePos();
         }
         function savePos() {
@@ -117,7 +116,7 @@
                 const stu = s.querySelector('.student');
                 if (stu) db.map[s.id.replace('s', '')] = stu.innerText;
             });
-            localStorage.setItem('class_v6', JSON.stringify(db));
+            localStorage.setItem('class_v7', JSON.stringify(db));
         }
         function shuffle() {
             const seats = Array.from(document.querySelectorAll('.seat:not(.hide)'));
