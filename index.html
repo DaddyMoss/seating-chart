@@ -1,33 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
     <title>Classroom Map</title>
     <style>
-        :root { --seat-color: #438a2e; }
-        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; background: #111; color: white; overflow: hidden; display: flex; flex-direction: column; }
-        #vid-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; pointer-events: none; background: black; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: Arial; background: #111; color: white; overflow: hidden; }
+        #vid-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: black; }
         #vid-bg iframe { position: absolute; top: 50%; left: 50%; width: 100vw; height: 56.25vw; min-height: 100vh; min-width: 177.77vh; transform: translate(-50%, -50%); opacity: 0.4; border: none; }
         header { padding: 20px; display: flex; justify-content: space-between; align-items: center; }
-        #label { background: white; color: black; padding: 10px 30px; font-size: 24px; font-weight: bold; border-radius: 4px; }
-        #grid { flex-grow: 1; display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(6, 1fr); gap: 10px; padding: 0 40px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-        .seat { border: 2px dashed rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; height: 100%; }
+        #label { background: white; color: #000; padding: 10px 30px; font-size: 24px; font-weight: bold; border-radius: 4px; }
+        #grid { display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(6, 1fr); gap: 10px; padding: 0 40px; height: 60vh; max-width: 1200px; margin: 0 auto; }
+        .seat { border: 2px dashed rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
         .hide { visibility: hidden; }
-        .student { background: var(--seat-color); color: white; padding: 10px; width: 85%; text-align: center; font-weight: bold; border-radius: 4px; cursor: move; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .footer { height: 140px; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 40px 20px; box-sizing: border-box; }
+        .student { background: #438a2e; color: white; padding: 10px; width: 80%; text-align: center; font-weight: bold; border-radius: 4px; cursor: move; }
+        .footer { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 40px; box-sizing: border-box; }
         #absent { width: 180px; height: 110px; border: 2px solid #444; background: rgba(0,0,0,0.8); border-radius: 8px; padding: 8px; display: flex; flex-wrap: wrap; gap: 4px; overflow-y: auto; }
-        #absent .student { width: 90%; font-size: 10px; padding: 4px; margin: 0 auto; }
         button { cursor: pointer; padding: 12px 24px; border: none; border-radius: 4px; font-weight: bold; background: white; color: black; }
-        #modal-box { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; }
-        #modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 12px; width: 400px; border: 1px solid #555; }
+        #modal-box { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; }
+        #modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 12px; width: 400px; }
         input, textarea { width: 100%; margin-bottom: 15px; padding: 10px; box-sizing: border-box; background: #000; color: white; border: 1px solid #444; }
     </style>
 </head>
-<body onload="init()" onclick="runVid()">
+<body onload="initApp()">
     <div id="vid-bg"></div>
     <header>
         <div id="label">CLASS NAME</div>
-        <button onclick="shuffle()">SHUFFLE</button>
+        <button onclick="shuffleGrid()">SHUFFLE</button>
     </header>
     <div id="grid"></div>
     <div class="footer">
@@ -40,90 +38,122 @@
             <input type="text" id="in-label" placeholder="Class Name">
             <textarea id="in-names" rows="5" placeholder="Names (Comma separated)"></textarea>
             <input type="text" id="in-yt" placeholder="YouTube Link">
-            <input type="color" id="in-color" value="#438a2e">
-            <button onclick="save()" style="background:green; color:white; width:100%; margin-bottom:10px;">SAVE</button>
+            <button onclick="saveData()" style="background:green; color:white; width:100%; margin-bottom:10px;">SAVE</button>
             <button onclick="closeSet()" style="background:#444; color:white; width:100%;">CLOSE</button>
         </div>
     </div>
     <script>
-        let db = { label: "1A", names: [], yt: "", color: "#438a2e", map: {} };
-        const corners =;
-        function init() {
-            const data = localStorage.getItem('class_v7');
-            if (data) { db = JSON.parse(data); } else { setTimeout(openSet, 500); }
-            render();
+        var config = { label: "1A", names: [], yt: "", map: {} };
+        var corners =;
+
+        function initApp() {
+            var data = localStorage.getItem('classroom_v10');
+            if (data) {
+                config = JSON.parse(data);
+                renderApp();
+            } else {
+                openSet();
+                renderApp();
+            }
         }
-        function render() {
-            const grid = document.getElementById('grid');
+
+        function renderApp() {
+            var grid = document.getElementById('grid');
             grid.innerHTML = '';
-            for (let i = 0; i < 36; i++) {
-                const s = document.createElement('div');
-                s.className = corners.includes(i) ? 'seat hide' : 'seat';
-                s.id = 's' + i; s.setAttribute('ondrop', 'drop(event)'); s.setAttribute('ondragover', 'allow(event)');
-                if (db.map[i]) s.appendChild(createStu(db.map[i]));
+            for (var i = 0; i < 36; i++) {
+                var s = document.createElement('div');
+                s.className = (corners.indexOf(i) > -1) ? 'seat hide' : 'seat';
+                s.id = 's' + i;
+                s.setAttribute('ondrop', 'drop(event)');
+                s.setAttribute('ondragover', 'allow(event)');
+                if (config.map[i]) { s.appendChild(createStu(config.map[i])); }
                 grid.appendChild(s);
             }
-            document.getElementById('label').innerText = db.label;
-            document.documentElement.style.setProperty('--seat-color', db.color);
-            const abs = document.getElementById('absent');
-            const seated = Object.values(db.map);
+            document.getElementById('label').innerText = config.label;
+            var abs = document.getElementById('absent');
+            var seated = [];
+            for (var k in config.map) { seated.push(config.map[k]); }
             abs.innerHTML = '';
-            db.names.forEach(n => { if (!seated.includes(n)) abs.appendChild(createStu(n)); });
-            runVid();
-        }
-        function runVid() {
-            const bg = document.getElementById('vid-bg');
-            if (db.yt && bg.innerHTML === "") {
-                const idMatch = db.yt.match(/(?:v=|\/be\/|embed\/|shorts\/)([^?&]+)/);
-                if (idMatch) {
-                    const id = idMatch;
-                    bg.innerHTML = `<iframe src="https://youtube.com{id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0" allow="autoplay"></iframe>`;
+            for (var j = 0; j < config.names.length; j++) {
+                var n = config.names[j];
+                if (seated.indexOf(n) === -1) { abs.appendChild(createStu(n)); }
+            }
+            if (config.yt) {
+                var id = config.yt.split('v=');
+                if (id) {
+                    document.getElementById('vid-bg').innerHTML = '<iframe src="https://youtube.com' + id + '?autoplay=1&mute=1&loop=1&playlist=' + id + '&controls=0" allow="autoplay"></iframe>';
                 }
             }
         }
+
         function createStu(n) {
-            const d = document.createElement('div');
+            var d = document.createElement('div');
             d.className = 'student'; d.innerText = n; d.draggable = true;
-            d.id = 'stu-' + Math.random().toString(36).substr(2, 5);
+            d.id = 'stu-' + Math.floor(Math.random() * 100000);
             d.setAttribute('ondragstart', 'drag(event)');
             return d;
         }
+
         function openSet() { document.getElementById('modal-box').style.display = 'block'; }
         function closeSet() { document.getElementById('modal-box').style.display = 'none'; }
-        function save() {
-            db.label = document.getElementById('in-label').value;
-            db.names = document.getElementById('in-names').value.split(',').map(n => n.trim()).filter(n => n);
-            db.yt = document.getElementById('in-yt').value;
-            db.color = document.getElementById('in-color').value;
-            db.map = {}; 
-            localStorage.setItem('class_v7', JSON.stringify(db));
+
+        function saveData() {
+            config.label = document.getElementById('in-label').value;
+            var raw = document.getElementById('in-names').value.split(',');
+            config.names = [];
+            for (var i = 0; i < raw.length; i++) {
+                var c = raw[i].replace(/^\s+|\s+$/g, '');
+                if (c) config.names.push(c);
+            }
+            config.yt = document.getElementById('in-yt').value;
+            config.map = {}; 
+            localStorage.setItem('classroom_v10', JSON.stringify(config));
             location.reload();
         }
+
         function allow(e) { e.preventDefault(); }
         function drag(e) { e.dataTransfer.setData("text", e.target.id); }
         function drop(e) {
-            e.preventDefault(); const id = e.dataTransfer.getData("text"); const el = document.getElementById(id);
-            const target = e.target; const zone = target.closest('.seat') || target.closest('#absent');
-            if (!zone || zone.classList.contains('hide')) return;
-            if (target.classList.contains('student')) {
-                const p1 = el.parentNode; const p2 = target.parentNode; p2.appendChild(el); p1.appendChild(target);
+            e.preventDefault();
+            var id = e.dataTransfer.getData("text");
+            var el = document.getElementById(id);
+            var target = e.target;
+            var zone = target;
+            while (zone && zone.className.indexOf('seat') === -1 && zone.id !== 'absent') { zone = zone.parentNode; }
+            if (!zone || zone.className.indexOf('hide') > -1) return;
+            if (target.className === 'student') {
+                var p1 = el.parentNode; var p2 = target.parentNode;
+                p2.appendChild(el); p1.appendChild(target);
             } else { zone.appendChild(el); }
-            savePos();
+            savePositions();
         }
-        function savePos() {
-            db.map = {}; 
-            document.querySelectorAll('.seat').forEach(s => {
-                const stu = s.querySelector('.student');
-                if (stu) db.map[s.id.replace('s', '')] = stu.innerText;
-            });
-            localStorage.setItem('class_v7', JSON.stringify(db));
+
+        function savePositions() {
+            config.map = {};
+            var s = document.getElementsByClassName('seat');
+            for (var i = 0; i < s.length; i++) {
+                var stu = s[i].getElementsByClassName('student');
+                if (stu.length > 0) { config.map[s[i].id.replace('s', '')] = stu[0].innerText; }
+            }
+            localStorage.setItem('classroom_v10', JSON.stringify(config));
         }
-        function shuffle() {
-            const seats = Array.from(document.querySelectorAll('.seat:not(.hide)'));
-            const stus = Array.from(document.querySelectorAll('.student')).filter(s => s.closest('.seat'));
-            seats.forEach(s => s.innerHTML = ''); 
-            stus.sort(() => Math.random() - 0.5).forEach((s, i) => { if (seats[i]) seats[i].appendChild(s); });
-            savePos();
+
+        function shuffleGrid() {
+            var s = document.getElementsByClassName('seat');
+            var stus = [];
+            for (var i = 0; i < s.length; i++) {
+                var child = s[i].getElementsByClassName('student');
+                if (child.length > 0) { stus.push(child[0]); s[i].innerHTML = ''; }
+            }
+            stus.sort(function(){ return 0.5 - Math.random(); });
+            var count = 0;
+            for (var j = 0; j < s.length; j++) {
+                if (s[j].className.indexOf('hide') === -1 && count < stus.length) {
+                    s[j].appendChild(stus[count]);
+                    count++;
+                }
+            }
+            savePositions();
         }
     </script>
 </body>
