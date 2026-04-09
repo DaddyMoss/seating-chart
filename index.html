@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Classroom Seating Map</title>
+    <style>
+        :root { --seat-color: #438a2e; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Helvetica', sans-serif; background: #1a1a1a; color: white; overflow: hidden; }
+        body { display: flex; flex-direction: column; height: 100vh; }
+        
+        #bg-video-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; pointer-events: none; background: black; }
+        #bg-video-container iframe { position: absolute; top: 50%; left: 50%; width: 100vw; height: 56.25vw; min-height: 100vh; min-width: 177.77vh; transform: translate(-50%, -50%); opacity: 0.4; border: none; }
+
+        header { padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        #class-label { background: white; color: black; padding: 10px 30px; font-size: 24px; font-weight: bold; border-radius: 4px; text-transform: uppercase; }
+
+        #grid-container { flex-grow: 1; display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(6, 1fr); gap: 12px; padding: 0 40px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; z-index: 5; }
+        .seat { border: 2px dashed rgba(255,255,255,0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); }
+        .hidden-seat { visibility: hidden; pointer-events: none; }
+
+        .student { background: var(--seat-color); color: white; padding: 10px; width: 88%; text-align: center; font-weight: bold; border-radius: 4px; cursor: move; user-select: none; font-size: 1em; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+
+        .footer-tools { height: 140px; display: flex; justify-content: space-between; align-items: flex-end; padding: 10px 40px 20px; box-sizing: border-box; z-index: 10; }
+        .absent-zone { width: 16.6%; min-width: 160px; height: 110px; border: 2px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.8); display: flex; flex-wrap: wrap; align-content: flex-start; padding: 8px; border-radius: 8px; overflow-y: auto; gap: 4px; }
+        .absent-zone .student { width: 90%; font-size: 11px; padding: 4px; box-shadow: none; margin: 0 auto; }
+        
+        button { cursor: pointer; padding: 12px 24px; border: none; border-radius: 4px; font-weight: bold; background: #fff; color: #000; text-transform: uppercase; }
+        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; padding: 30px; border-radius: 12px; z-index: 100; border: 1px solid #444; width: 400px; }
+        input, textarea { width: 100%; margin-bottom: 12px; padding: 10px; box-sizing: border-box; background: #333; color: white; border: 1px solid #555; border-radius: 4px; }
+    </style>
+</head>
+<body onload="initApp()" onclick="playVideo()">
+
+    <div id="bg-video-container"></div>
+
+    <header>
+        <div id="class-label">CLASS NAME</div>
+        <button onclick="shuffleStudents()">SHUFFLE GRID</button>
+    </header>
+
+    <div id="grid-container"></div>
+
+    <div class="footer-tools">
+        <div class="absent-zone" id="absent-box" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div style="width:100%; font-size: 10px; color:#aaa; margin-bottom: 3px; text-align: center;">ABSENT</div>
+        </div>
+        <button onclick="toggleModal(true)">SETTINGS ⚙️</button>
+    </div>
+
+    <div id="modal">
+        <h3>Settings</h3>
+        <input type="text" id="inp-className" placeholder="Class Name">
+        <textarea id="inp-students" rows="4" placeholder="Names (Comma separated)"></textarea>
+        <input type="text" id="inp-yt" placeholder="Paste YouTube Link">
+        <label style="font-size: 12px; color: #aaa;">Seat Color:</label>
+        <input type="color" id="inp-color">
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button onclick="saveSettings()" style="background: #438a2e; color: white; flex: 1;">SAVE</button>
+            <button onclick="resetApp()" style="background: #a32e2e; color: white;">RESET</button>
+        </div>
+        <button onclick="toggleModal(false)" style="width: 100%; margin-top: 10px; background: #444; color: white;">CLOSE</button>
+    </div>
+
+    <script>
+        let config = { className: "1A", students: [], ytUrl: "", seatColor: "#438a2e", positions: {} };
+        const corners =;
+
+        function initApp() {
+            const saved = localStorage.getItem('gh_seating');
+            if (saved) config = JSON.parse(saved);
+            if (Object.keys(config.positions).length === 0 && config.students.length > 0) {
+                let seatIdx = 0;
+                config.students.forEach(name => {
+                    while (corners.includes(seatIdx) && seatIdx < 36) seatIdx++;
+                    if (seatIdx < 36) config.positions[seatIdx] = name;
+                    seatIdx++;
+                });
+            }
+            renderGrid();
+        }
+
+        function playVideo() {
+            const container = document.getElementById('bg-video-container');
+            if (config.ytUrl && container.innerHTML === "") {
+                const match = config.ytUrl.match(/(?:v=|\/be\/|embed\/|shorts\/)([^?&]+)/);
+                const vidId = match ? match : "";
+                if(vidId) {
+                    container.innerHTML = `<iframe src="https://youtube.com{vidId}?autoplay=1&mute=1&loop=1&playlist=${vidId}&controls=0&rel=0" allow="autoplay; encrypted-media"></iframe>`;
+                }
+            }
+        }
+
+        function renderGrid() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+            for (let i = 0; i < 36; i++) {
+                const seat = document.createElement('div');
+                seat.className = corners.includes(i) ? 'seat hidden-seat' : 'seat';
+                seat.id = 'seat-' + i;
+                seat.setAttribute('ondrop', 'drop(event)');
+                seat.setAttribute('ondragover', 'allowDrop(event)');
+                const name = config.positions[i];
+                if (name && !corners.includes(i)) seat.appendChild(createStudentEl(name));
+                container.appendChild(seat);
+            }
+            const abs = document.getElementById('absent-box');
+            const seated = Object.values(config.positions);
+            Array.from(abs.querySelectorAll('.student')).forEach(el => el.remove());
+            config.students.forEach(name => { if (!seated.includes(name)) abs.appendChild(createStudentEl(name)); });
+            document.getElementById('class-label').innerText = config.className;
+            document.documentElement.style.setProperty('--seat-color', config.seatColor);
+        }
+
+        function createStudentEl(name) {
+            const el = document.createElement('div');
+            el.className = 'student';
+            el.id = 's-' + Math.random().toString(36).substr(2, 5);
+            el.innerText = name;
+            el.draggable = true;
+            el.setAttribute('ondragstart', 'drag(event)');
+            return el;
+        }
+
+        function toggleModal(show) {
+            document.getElementById('modal').style.display = show ? 'block' : 'none';
+            if (show) {
+                document.getElementById('inp-className').value = config.className;
+                document.getElementById('inp-students').value = config.students.join(', ');
+                document.getElementById('inp-yt').value = config.ytUrl;
+                document.getElementById('inp-color').value = config.seatColor;
+            }
+        }
+
+        function saveSettings() {
+            config.className = document.getElementById('inp-className').value;
+            config.students = document.getElementById('inp-students').value.split(',').map(n => n.trim()).filter(n => n);
+            config.ytUrl = document.getElementById('inp-yt').value;
+            config.seatColor = document.getElementById('inp-color').value;
+            config.positions = {};
+            localStorage.setItem('gh_seating', JSON.stringify(config));
+            location.reload();
+        }
+
+        function allowDrop(ev) { ev.preventDefault(); }
+        function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+        function drop(ev) {
+            ev.preventDefault();
+            const draggedEl = document.getElementById(ev.dataTransfer.getData("text"));
+            const target = ev.target;
+            const zone = target.closest('.seat') || target.closest('.absent-zone');
+            if (!zone || zone.classList.contains('hidden-seat')) return;
+            if (target.classList.contains('student')) {
+                const p1 = draggedEl.parentNode;
+                const p2 = target.parentNode;
+                p2.appendChild(draggedEl); p1.appendChild(target);
+            } else { zone.appendChild(draggedEl); }
+            updatePos();
+        }
+
+        function updatePos() {
+            config.positions = {};
+            document.querySelectorAll('.seat').forEach(s => {
+                const stu = s.querySelector('.student');
+                if (stu) config.positions[s.id.replace('seat-', '')] = stu.innerText;
+            });
+            localStorage.setItem('gh_seating', JSON.stringify(config));
+        }
+
+        function shuffleStudents() {
+            const seats = Array.from(document.querySelectorAll('.seat:not(.hidden-seat)'));
+            const students = Array.from(document.querySelectorAll('.student')).filter(s => s.closest('.seat'));
+            seats.forEach(s => s.innerHTML = '');
+            students.sort(() => Math.random() - 0.5).forEach((s, i) => { if (seats[i]) seats[i].appendChild(s); });
+            updatePos();
+        }
+
+        function resetApp() { if(confirm("Reset?")) { localStorage.removeItem('gh_seating'); location.reload(); } }
+    </script>
+</body>
+</html>
